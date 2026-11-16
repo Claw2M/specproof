@@ -123,12 +123,18 @@ describe('specproof mcp-server and cli', () => {
         ],
         {
           encoding: 'utf8',
-          env: { ...process.env, SPECPROOF_CLOUD_TOKEN: 'cloud-tok' },
+          env: {
+            ...process.env,
+            SPECPROOF_CLOUD_TOKEN: 'cloud-tok',
+            GITHUB_HEAD_REF: '',
+            GITHUB_REF_NAME: 'main',
+          },
         },
       );
 
       expect(output).toContain('SpecProof Verification Gate: PASSED');
       expect(store.listRuns()).toHaveLength(1);
+      expect(store.listRuns()[0]?.branch).toBe('main');
       expect(store.listRuns()[0]?.mutationScore).toBe(100);
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));

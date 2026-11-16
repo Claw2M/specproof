@@ -110,7 +110,7 @@ export async function uploadVerificationReport(
     headers,
     body: JSON.stringify({
       repoSlug: safeRepo,
-      branch: options.branch,
+      branch: options.branch?.trim() || undefined,
       prNumber: options.prNumber,
       report: options.report,
     }),

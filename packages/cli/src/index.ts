@@ -100,10 +100,15 @@ function runInit(repoRoot: string): void {
   );
 }
 
+function nonEmpty(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
 function resolvePrNumber(prFlag: string | undefined): number | undefined {
   const prRaw =
-    prFlag ??
-    process.env.PR_NUMBER ??
+    nonEmpty(prFlag) ??
+    nonEmpty(process.env.PR_NUMBER) ??
     /refs\/pull\/(\d+)\//.exec(process.env.GITHUB_REF ?? '')?.[1];
   if (prRaw === undefined) {
     return undefined;
@@ -196,7 +201,9 @@ async function main(): Promise<void> {
     const cloudUrl = values.cloud;
     const uploadUrl = values.upload ?? cloudUrl;
     const repoSlug =
-      values['repo-slug'] ?? process.env.GITHUB_REPOSITORY ?? inferRepoSlugFromGit(repoRoot);
+      nonEmpty(values['repo-slug']) ??
+      nonEmpty(process.env.GITHUB_REPOSITORY) ??
+      inferRepoSlugFromGit(repoRoot);
 
     let cloudSpecMarkdown: string | undefined;
     let blockOnMockAbuse: boolean | undefined = values.strict ? true : undefined;
@@ -275,7 +282,7 @@ async function main(): Promise<void> {
 
     if (values['post-check-run']) {
       const token = process.env.GITHUB_TOKEN;
-      const headSha = values.sha ?? process.env.GITHUB_SHA;
+      const headSha = nonEmpty(values.sha) ?? nonEmpty(process.env.GITHUB_SHA);
       if (!token || !repoSlug || !headSha) {
         throw new Error(
           'Missing Check Run context: ensure GITHUB_TOKEN, --repo-slug (or git origin), and --sha (or GITHUB_SHA) are set.',
@@ -295,11 +302,15 @@ async function main(): Promise<void> {
 
     if (uploadUrl) {
       const prNumber = resolvePrNumber(values.pr);
+      const branch =
+        nonEmpty(values.branch) ??
+        nonEmpty(process.env.GITHUB_HEAD_REF) ??
+        nonEmpty(process.env.GITHUB_REF_NAME);
       const uploaded = await uploadVerificationReport({
         cloudUrl: uploadUrl,
         report,
         repoSlug,
-        branch: values.branch ?? process.env.GITHUB_HEAD_REF,
+        branch,
         prNumber,
         token: process.env.SPECPROOF_CLOUD_TOKEN,
       });
