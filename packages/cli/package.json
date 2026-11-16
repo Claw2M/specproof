@@ -1,0 +1,35 @@
+{
+  "name": "@specproof/cli",
+  "version": "0.1.0",
+  "description": "CLI and GitHub Action verification gate for SpecProof.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "specproof": "./dist/index.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "keywords": ["specproof", "cli", "github-actions", "ci-cd", "mutation-testing", "mcp"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@specproof/core": "0.1.0",
+    "@specproof/mcp-server": "0.1.0",
+    "@specproof/mutator": "0.1.0"
+  }
+}

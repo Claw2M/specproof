@@ -1,0 +1,10 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/core" },
+    { "path": "packages/mutator" },
+    { "path": "packages/mcp-server" },
+    { "path": "packages/cli" },
+    { "path": "apps/web" }
+  ]
+}

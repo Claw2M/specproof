@@ -1,0 +1,10 @@
+{
+  "testCommand": "npm test",
+  "maxMutantsPerRun": 25,
+  "mutationTimeoutMs": 15000,
+  "failUnderMutationScore": 70,
+  "mockToAssertionMaxRatio": 2.5,
+  "minMocksBeforeFlagging": 3,
+  "specFile": "SPEC.md",
+  "ignorePatterns": ["node_modules", "dist", "coverage", ".specproof-tmp", "examples"]
+}

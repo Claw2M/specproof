@@ -1,0 +1,22 @@
+name: SpecProof CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run verify
+      - name: Run SpecProof Verification Gate
+        run: node packages/cli/dist/index.js check --all --spec SPEC.md --markdown

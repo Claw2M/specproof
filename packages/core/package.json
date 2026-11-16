@@ -1,0 +1,30 @@
+{
+  "name": "@specproof/core",
+  "version": "0.1.0",
+  "description": "Git diff parser, AST test integrity analyzer, spec mapper, and report formatters for SpecProof.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "keywords": ["specproof", "testing", "mutation-testing", "ai-code-review", "devtools"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "typescript": "^5.8.0"
+  }
+}

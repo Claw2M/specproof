@@ -1,0 +1,21 @@
+services:
+  specproof-cloud:
+    build: .
+    ports:
+      - "4310:4310"
+    environment:
+      PORT: "4310"
+      SPECPROOF_DB_PATH: "/data/cloud.sqlite"
+      # Optional: uncomment to require Bearer token for ingest/mutations
+      # SPECPROOF_CLOUD_TOKEN: "change-me"
+    volumes:
+      - specproof_data:/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4310/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+volumes:
+  specproof_data:

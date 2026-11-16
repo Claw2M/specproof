@@ -1,0 +1,140 @@
+name: 'SpecProof Verification Gate'
+description: 'Diff-scoped test integrity, micro-mutation, and spec-to-PR verification gate for AI-assisted teams.'
+branding:
+  icon: 'shield'
+  color: 'green'
+
+inputs:
+  base-ref:
+    description: 'Git base ref to diff against (e.g. origin/main)'
+    required: false
+    default: 'origin/main'
+  all:
+    description: 'Scan all repository files instead of only git diff'
+    required: false
+    default: 'false'
+  mutate:
+    description: 'Run diff-scoped micro-mutation testing'
+    required: false
+    default: 'true'
+  fail-under:
+    description: 'Minimum diff mutation score (0-100)'
+    required: false
+    default: '70'
+  spec:
+    description: 'Path to markdown spec or acceptance criteria file'
+    required: false
+    default: ''
+  llm:
+    description: 'Enable BYOK LLM semantic spec evaluation'
+    required: false
+    default: 'false'
+  provider:
+    description: 'Optional BYOK LLM provider (openai | anthropic | gemini)'
+    required: false
+    default: ''
+  model:
+    description: 'Optional BYOK LLM model override'
+    required: false
+    default: ''
+  post-pr-comment:
+    description: 'Create or update sticky PR summary comment'
+    required: false
+    default: 'true'
+  post-check-run:
+    description: 'Publish GitHub Check Run with inline annotations'
+    required: false
+    default: 'false'
+  sha:
+    description: 'Optional commit SHA for Check Run publishing (defaults to github.event.pull_request.head.sha or github.sha)'
+    required: false
+    default: ''
+  cloud:
+    description: 'Optional SpecProof Team Cloud URL to pull policies/specs and upload proof'
+    required: false
+    default: ''
+  upload:
+    description: 'Optional SpecProof Team Cloud URL for upload-only'
+    required: false
+    default: ''
+  repo-slug:
+    description: 'Optional GitHub repo slug (defaults to github.repository)'
+    required: false
+    default: ''
+  branch:
+    description: 'Optional branch name override'
+    required: false
+    default: ''
+  test-command:
+    description: 'Override test command'
+    required: false
+    default: ''
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+
+    - name: Install & Build SpecProof Action
+      shell: bash
+      run: |
+        cd "${{ github.action_path }}"
+        npm ci
+        npm run build
+
+    - name: Run SpecProof Check
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+      run: |
+        ARGS=("check" "--repo" "${{ github.workspace }}" "--base" "${{ inputs.base-ref }}")
+        if [ "${{ inputs.all }}" = "true" ]; then
+          ARGS+=("--all")
+        fi
+        if [ "${{ inputs.mutate }}" = "true" ]; then
+          ARGS+=("--mutate" "--fail-under" "${{ inputs.fail-under }}")
+        fi
+        if [ -n "${{ inputs.spec }}" ]; then
+          ARGS+=("--spec" "${{ inputs.spec }}")
+        fi
+        if [ "${{ inputs.llm }}" = "true" ]; then
+          ARGS+=("--llm")
+        fi
+        if [ -n "${{ inputs.provider }}" ]; then
+          ARGS+=("--provider" "${{ inputs.provider }}")
+        fi
+        if [ -n "${{ inputs.model }}" ]; then
+          ARGS+=("--model" "${{ inputs.model }}")
+        fi
+        if [ "${{ inputs.post-pr-comment }}" = "true" ] && [ -n "${{ github.event.pull_request.number }}" ]; then
+          ARGS+=("--post-pr-comment")
+        fi
+        if [ "${{ inputs.post-check-run }}" = "true" ]; then
+          TARGET_SHA="${{ inputs.sha }}"
+          if [ -z "$TARGET_SHA" ]; then
+            TARGET_SHA="${{ github.event.pull_request.head.sha }}"
+          fi
+          if [ -z "$TARGET_SHA" ]; then
+            TARGET_SHA="${{ github.sha }}"
+          fi
+          ARGS+=("--post-check-run" "--sha" "$TARGET_SHA")
+        fi
+        if [ -n "${{ inputs.cloud }}" ]; then
+          ARGS+=("--cloud" "${{ inputs.cloud }}")
+        elif [ -n "${{ inputs.upload }}" ]; then
+          ARGS+=("--upload" "${{ inputs.upload }}")
+        fi
+        if [ -n "${{ inputs.repo-slug }}" ]; then
+          ARGS+=("--repo-slug" "${{ inputs.repo-slug }}")
+        fi
+        if [ -n "${{ inputs.branch }}" ]; then
+          ARGS+=("--branch" "${{ inputs.branch }}")
+        fi
+        if [ -n "${{ inputs.test-command }}" ]; then
+          ARGS+=("--test-cmd" "${{ inputs.test-command }}")
+        fi
+        node "${{ github.action_path }}/packages/cli/dist/index.js" "${ARGS[@]}"
