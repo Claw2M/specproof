@@ -202,6 +202,7 @@ describe('SpecProof Team Cloud server & SQLite store', () => {
       expect(html).toContain('meta name="color-scheme" content="dark"');
       expect(html).toContain('--canvas: #090909');
       expect(html).toContain('Synced Specs (Linear / Jira / GitHub)');
+      expect(html).toContain('spec-pull-form');
       expect(html).toContain('guide-dialog');
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));

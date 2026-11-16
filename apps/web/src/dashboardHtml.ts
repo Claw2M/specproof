@@ -544,12 +544,24 @@ export function renderDashboardHtml(): string {
       border: 1px solid var(--hairline);
       border-radius: var(--rounded-md);
       padding: 10px 14px;
-      min-block-size: 40px;
-      font-family: inherit;
-      font-size: 14px;
+      min-block-size: 44px;
+      font: inherit;
+      font-size: max(1rem, 14px);
       letter-spacing: -0.14px;
       outline: none;
       max-inline-size: 100%;
+      inline-size: 100%;
+    }
+
+    @media (pointer: coarse) {
+      .text-input {
+        min-block-size: 48px;
+      }
+    }
+
+    .toolbar .text-input,
+    .policy-row .text-input {
+      inline-size: auto;
     }
 
     .control-panel .text-input {
@@ -560,8 +572,52 @@ export function renderDashboardHtml(): string {
       color: var(--ink-muted);
     }
 
-    .text-input:focus {
-      box-shadow: 0 0 0 1px rgba(0, 153, 255, 0.55), 0 0 0 4px rgba(0, 153, 255, 0.15);
+    .text-input:focus-visible {
+      outline: 2px solid var(--accent-blue);
+      outline-offset: 2px;
+      box-shadow: 0 0 0 4px rgba(0, 153, 255, 0.15);
+    }
+
+    :is(.text-input):user-invalid {
+      border-color: var(--gradient-coral);
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 4px;
+      min-inline-size: 0;
+    }
+
+    .field-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--ink-muted);
+      letter-spacing: -0.12px;
+    }
+
+    .error-msg {
+      display: none;
+      font-size: 12px;
+      color: var(--gradient-coral);
+      margin-block-start: 2px;
+    }
+
+    :is(input, select, textarea):user-invalid ~ .error-msg {
+      display: block;
+    }
+
+    .visually-hidden:where(:not(:focus-within, :active)) {
+      position: absolute !important;
+      clip-path: inset(50%) !important;
+      overflow: hidden !important;
+      width: 1px !important;
+      height: 1px !important;
+      margin: -1px !important;
+      padding: 0 !important;
+      border: 0 !important;
+      white-space: nowrap !important;
     }
 
     /* Responsive Table with sticky headers & @container mobile stack */
@@ -1208,7 +1264,7 @@ curl http://localhost:4310/health</pre>
     <section class="hero" id="quickstart">
       <div class="hero-eyebrow">
         <strong>Open-Core v0.2</strong>
-        <span>TS/JS + Python + MCP + GitHub Action</span>
+        <span>TS/JS + Python + Go + MCP + GitHub Action</span>
       </div>
       <h1 class="display-hero">Ship AI code with mathematical proof.</h1>
       <p class="hero-subhead">
@@ -1383,27 +1439,79 @@ Spec Match : 3/3 acceptance criteria verified</pre>
         <div class="split-2">
           <div class="subcard">
             <div class="toolbar" style="margin-block-end:12px;">
-              <h3 style="margin:0;">Synced Specs (Linear / Jira / GitHub)</h3>
-              <span id="spec-toast" class="toast-msg" aria-live="polite"></span>
+              <h3 id="specs-heading" style="margin:0;">Synced Specs (Linear / Jira / GitHub)</h3>
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <span id="spec-toast" class="toast-msg" role="status" aria-live="polite"></span>
+                <div class="tab-group" role="group" aria-label="Spec sync mode">
+                  <button type="button" class="tab-pill spec-mode-pill" data-spec-mode="pull" aria-pressed="false">Pull Live Issue</button>
+                  <button type="button" class="tab-pill spec-mode-pill" data-spec-mode="manual" aria-pressed="true">Manual Checklist</button>
+                </div>
+              </div>
             </div>
             <div id="spec-list" class="spec-list" style="margin-block-end:14px;"></div>
-            <form id="spec-form" class="policy-form">
+
+            <form id="spec-pull-form" class="policy-form" aria-labelledby="specs-heading" hidden>
               <div class="spec-form-grid">
-                <input id="spec-ext-id" class="text-input" type="text" placeholder="Ticket ID (e.g. LIN-412)" required />
-                <select id="spec-source" class="text-input" aria-label="Spec source">
-                  <option value="linear">Linear</option>
-                  <option value="jira">Jira</option>
-                  <option value="github">GitHub Issue</option>
-                  <option value="manual">Manual</option>
-                </select>
+                <div class="field">
+                  <label class="field-label" for="pull-source">Issue Provider <span aria-hidden="true">*</span></label>
+                  <select id="pull-source" name="source" class="text-input">
+                    <option value="github">GitHub Issue (public or GITHUB_TOKEN)</option>
+                    <option value="linear">Linear (LINEAR_API_KEY)</option>
+                    <option value="jira">Jira (JIRA_BASE_URL + Token)</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label class="field-label" for="pull-ext-id">Issue / Ticket ID <span aria-hidden="true">*</span></label>
+                  <input id="pull-ext-id" name="externalId" class="text-input" type="text" placeholder="e.g. #42 or ENG-18" required autocorrect="off" autocapitalize="none" spellcheck="false" data-error="pull-ext-id-err" aria-invalid="false" />
+                  <span id="pull-ext-id-err" class="error-msg">Enter a valid issue number or ticket ID.</span>
+                </div>
               </div>
-              <div class="spec-form-grid">
-                <input id="spec-repo" class="text-input" type="text" placeholder="Target owner/repo" required />
-                <input id="spec-title" class="text-input" type="text" placeholder="Acceptance title" required />
+              <div class="field">
+                <label class="field-label" for="pull-repo">Target GitHub Repo (owner/repo) <span aria-hidden="true">*</span></label>
+                <input id="pull-repo" name="repoSlug" class="text-input" type="text" placeholder="e.g. acme/payments" required pattern="[A-Za-z0-9._-]+/[A-Za-z0-9._-]+" autocorrect="off" autocapitalize="none" spellcheck="false" data-error="pull-repo-err" aria-invalid="false" />
+                <span id="pull-repo-err" class="error-msg">Use owner/repo format (e.g. acme/payments).</span>
               </div>
-              <textarea id="spec-checklist" class="text-input" rows="3" placeholder="- [ ] Enforce boundary check" required></textarea>
               <div>
-                <button type="submit" class="btn-secondary">Sync Spec Checklist</button>
+                <button id="pull-submit-btn" type="submit" class="btn-primary">Pull Live Issue &amp; Sync</button>
+              </div>
+            </form>
+
+            <form id="spec-form" class="policy-form" aria-labelledby="specs-heading">
+              <div class="spec-form-grid">
+                <div class="field">
+                  <label class="field-label" for="spec-ext-id">Ticket ID <span aria-hidden="true">*</span></label>
+                  <input id="spec-ext-id" name="externalId" class="text-input" type="text" placeholder="e.g. LIN-412" required autocorrect="off" autocapitalize="none" spellcheck="false" data-error="spec-ext-id-err" aria-invalid="false" />
+                  <span id="spec-ext-id-err" class="error-msg">Ticket ID is required.</span>
+                </div>
+                <div class="field">
+                  <label class="field-label" for="spec-source">Source</label>
+                  <select id="spec-source" name="source" class="text-input">
+                    <option value="linear">Linear</option>
+                    <option value="jira">Jira</option>
+                    <option value="github">GitHub Issue</option>
+                    <option value="manual">Manual</option>
+                  </select>
+                </div>
+              </div>
+              <div class="spec-form-grid">
+                <div class="field">
+                  <label class="field-label" for="spec-repo">Target owner/repo <span aria-hidden="true">*</span></label>
+                  <input id="spec-repo" name="repoSlug" class="text-input" type="text" placeholder="e.g. acme/payments" required autocorrect="off" autocapitalize="none" spellcheck="false" data-error="spec-repo-err" aria-invalid="false" />
+                  <span id="spec-repo-err" class="error-msg">Repository slug is required.</span>
+                </div>
+                <div class="field">
+                  <label class="field-label" for="spec-title">Acceptance Title <span aria-hidden="true">*</span></label>
+                  <input id="spec-title" name="title" class="text-input" type="text" placeholder="e.g. Harden JWT callback" required data-error="spec-title-err" aria-invalid="false" />
+                  <span id="spec-title-err" class="error-msg">Title is required.</span>
+                </div>
+              </div>
+              <div class="field">
+                <label class="field-label" for="spec-checklist">Acceptance Checklist Markdown <span aria-hidden="true">*</span></label>
+                <textarea id="spec-checklist" name="checklistMarkdown" class="text-input" rows="3" placeholder="- [ ] Enforce boundary check" required data-error="spec-checklist-err" aria-invalid="false"></textarea>
+                <span id="spec-checklist-err" class="error-msg">Enter at least one acceptance criterion.</span>
+              </div>
+              <div>
+                <button id="spec-submit-btn" type="submit" class="btn-secondary">Sync Spec Checklist</button>
               </div>
             </form>
           </div>
@@ -1476,7 +1584,7 @@ Spec Match : 3/3 acceptance criteria verified</pre>
             <p class="tier-price">$0 <span>/ forever</span></p>
             <ul class="tier-list">
               <li>Local CLI &amp; MCP Server</li>
-              <li>TS/JS &amp; Python AST rules</li>
+              <li>TS/JS, Python &amp; Go AST rules</li>
               <li>Diff-scoped micro-mutation</li>
               <li>GitHub Action PR comments</li>
             </ul>
@@ -2067,10 +2175,134 @@ Spec Match : 3/3 acceptance criteria verified</pre>
       }
     });
 
+    for (const pill of document.querySelectorAll('.spec-mode-pill[data-spec-mode]')) {
+      pill.addEventListener('click', () => {
+        const mode = pill.getAttribute('data-spec-mode') || 'manual';
+        for (const p of document.querySelectorAll('.spec-mode-pill[data-spec-mode]')) {
+          p.setAttribute('aria-pressed', p === pill ? 'true' : 'false');
+        }
+        document.getElementById('spec-pull-form').hidden = mode !== 'pull';
+        document.getElementById('spec-form').hidden = mode !== 'manual';
+      });
+    }
+
+    // Accessible :user-invalid <-> aria-invalid + single polite live-region announcer
+    (function setupAccessibleFormErrors() {
+      const announcer = document.createElement('div');
+      announcer.setAttribute('aria-live', 'polite');
+      announcer.classList.add('visually-hidden');
+      document.body.append(announcer);
+
+      const flagged = new WeakSet();
+      const announced = new WeakSet();
+      let announceTimer;
+
+      function linkError(el, shown) {
+        const errorId = el.dataset ? el.dataset.error : undefined;
+        if (!errorId) return;
+        const ids = (el.getAttribute('aria-describedby') || '')
+          .split(/\s+/)
+          .filter((id) => id && id !== errorId);
+        if (shown) ids.push(errorId);
+        if (ids.length) el.setAttribute('aria-describedby', ids.join(' '));
+        else el.removeAttribute('aria-describedby');
+      }
+
+      function syncAria(el, shouldAnnounce) {
+        if (!el || !el.matches || !el.matches('input, select, textarea')) return;
+        let isUserInvalid = false;
+        try {
+          isUserInvalid = el.matches(':user-invalid');
+        } catch {
+          isUserInvalid = false;
+        }
+        if (isUserInvalid) {
+          if (shouldAnnounce && !announced.has(el) && el.dataset && el.dataset.error) {
+            const errNode = document.getElementById(el.dataset.error);
+            if (errNode) {
+              clearTimeout(announceTimer);
+              announcer.textContent = '';
+              announceTimer = setTimeout(() => {
+                announcer.textContent = errNode.textContent ? errNode.textContent.trim() : '';
+              }, 350);
+              announced.add(el);
+            }
+          }
+          el.setAttribute('aria-invalid', 'true');
+          linkError(el, true);
+          flagged.add(el);
+        } else if (flagged.has(el) || el.getAttribute('aria-invalid') !== 'true') {
+          el.setAttribute('aria-invalid', 'false');
+          linkError(el, false);
+          flagged.delete(el);
+          announced.delete(el);
+        }
+      }
+
+      for (const el of document.querySelectorAll('input, select, textarea')) {
+        syncAria(el, false);
+      }
+      document.addEventListener('blur', (ev) => syncAria(ev.target, true), true);
+      document.addEventListener('input', (ev) => {
+        if (ev.target && ev.target.hasAttribute && ev.target.hasAttribute('aria-invalid')) {
+          syncAria(ev.target, false);
+        }
+      });
+      document.addEventListener('change', (ev) => syncAria(ev.target, true), true);
+      document.addEventListener(
+        'invalid',
+        (ev) => {
+          announced.add(ev.target);
+          syncAria(ev.target, false);
+        },
+        true,
+      );
+      document.addEventListener(
+        'reset',
+        (ev) => {
+          const formEl = ev.target;
+          if (!formEl || !formEl.elements) return;
+          setTimeout(() => {
+            for (const el of formEl.elements) syncAria(el, false);
+          }, 0);
+        },
+        true,
+      );
+    })();
+
+    document.getElementById('spec-pull-form').addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const toast = document.getElementById('spec-toast');
+      const submitBtn = document.getElementById('pull-submit-btn');
+      const extId = document.getElementById('pull-ext-id').value.trim();
+      submitBtn.disabled = true;
+      toast.textContent = 'Pulling ' + extId + '...';
+      try {
+        const saved = await apiFetchJson('/api/specs/pull', {
+          method: 'POST',
+          headers: buildHeaders(true),
+          body: JSON.stringify({
+            source: document.getElementById('pull-source').value,
+            externalId: extId,
+            repoSlug: document.getElementById('pull-repo').value.trim(),
+          }),
+        });
+        document.getElementById('spec-pull-form').reset();
+        toast.textContent = 'Pulled & synced ' + saved.externalId;
+        await loadDashboard();
+      } catch (err) {
+        toast.textContent = 'Error: ' + (err instanceof Error ? err.message : String(err));
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+
     document.getElementById('spec-form').addEventListener('submit', async (ev) => {
       ev.preventDefault();
       const toast = document.getElementById('spec-toast');
+      const submitBtn = document.getElementById('spec-submit-btn');
       const extId = document.getElementById('spec-ext-id').value.trim();
+      submitBtn.disabled = true;
       try {
         await apiFetchJson('/api/specs', {
           method: 'POST',
@@ -2088,6 +2320,8 @@ Spec Match : 3/3 acceptance criteria verified</pre>
         await loadDashboard();
       } catch (err) {
         toast.textContent = 'Error: ' + (err instanceof Error ? err.message : String(err));
+      } finally {
+        submitBtn.disabled = false;
       }
     });
 
