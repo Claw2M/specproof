@@ -189,6 +189,18 @@ export function createCloudServer(options: CloudServerOptions): CloudServerHandl
         return;
       }
 
+      if (method === 'GET' && url.pathname === '/api/public/plans') {
+        const billing = store.getBilling();
+        sendJson(res, 200, {
+          catalog: PLAN_CATALOG,
+          checkoutUrls: {
+            team: process.env.SPECPROOF_TEAM_CHECKOUT_URL ?? billing.checkoutUrl ?? null,
+            scale: process.env.SPECPROOF_SCALE_CHECKOUT_URL ?? null,
+          },
+        });
+        return;
+      }
+
       if (method === 'GET' && url.pathname === '/') {
         res.writeHead(200, {
           'Content-Type': 'text/html; charset=utf-8',

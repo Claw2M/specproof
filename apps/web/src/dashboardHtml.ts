@@ -1603,7 +1603,7 @@ Spec Match : 3/3 acceptance criteria verified</pre>
               <li>Sticky GitHub PR checks</li>
             </ul>
           </div>
-          <button type="button" class="btn-primary open-guide-btn" data-guide-tab="cloud">Start Team Cloud</button>
+          <button id="pricing-team-cta" type="button" class="btn-primary open-guide-btn" data-guide-tab="cloud">Start Team Cloud</button>
         </article>
 
         <article class="pricing-card">
@@ -1617,7 +1617,7 @@ Spec Match : 3/3 acceptance criteria verified</pre>
               <li>BYOK LLM semantic gate</li>
             </ul>
           </div>
-          <a href="#control-plane" class="btn-secondary">Configure Policy</a>
+          <a id="pricing-scale-cta" href="#control-plane" class="btn-secondary">Configure Policy</a>
         </article>
 
         <article class="pricing-card">
@@ -2369,6 +2369,32 @@ Spec Match : 3/3 acceptance criteria verified</pre>
       }
     });
 
+    async function loadPublicPlans() {
+      try {
+        const res = await apiFetchJson('/api/public/plans');
+        const urls = res?.checkoutUrls || {};
+        const teamBtn = document.getElementById('pricing-team-cta');
+        if (teamBtn && urls.team) {
+          const link = document.createElement('a');
+          link.id = 'pricing-team-cta';
+          link.className = 'btn-primary';
+          link.href = urls.team;
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+          link.textContent = 'Subscribe ($29/mo)';
+          teamBtn.replaceWith(link);
+        }
+        const scaleBtn = document.getElementById('pricing-scale-cta');
+        if (scaleBtn && urls.scale) {
+          scaleBtn.href = urls.scale;
+          scaleBtn.target = '_blank';
+          scaleBtn.rel = 'noopener noreferrer';
+          scaleBtn.textContent = 'Subscribe Scale ($79/mo)';
+        }
+      } catch {}
+    }
+
+    loadPublicPlans();
     loadDashboard().catch(handleError);
   </script>
 </body>

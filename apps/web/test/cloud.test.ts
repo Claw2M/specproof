@@ -382,7 +382,14 @@ describe('SpecProof Team Cloud server & SQLite store', () => {
       }
       const baseUrl = `http://127.0.0.1:${addr.port}`;
 
-      // 1. Starts on OSS plan (maxRepos: 1)
+      // 1. Public plans endpoint works without auth; protected API rejects unauth
+      const publicPlans = await fetch(`${baseUrl}/api/public/plans`);
+      expect(publicPlans.status).toBe(200);
+      const plansJson = (await publicPlans.json()) as {
+        catalog: Record<string, { monthlyPriceUsd: number | null }>;
+      };
+      expect(plansJson.catalog.team.monthlyPriceUsd).toBe(29);
+
       const initBilling = await fetch(`${baseUrl}/api/billing`, {
         headers: { Authorization: 'Bearer billing-tok' },
       });

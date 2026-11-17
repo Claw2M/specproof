@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: specproof-team-cloud
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "4310"
+      - key: SPECPROOF_DB_PATH
+        value: /data/cloud.sqlite
+      - key: SPECPROOF_CLOUD_TOKEN
+        generateValue: true
+      - key: SPECPROOF_GITHUB_WEBHOOK_SECRET
+        generateValue: true
+      - key: SPECPROOF_ENFORCE_PLANS
+        value: "1"
+      - key: SPECPROOF_LEMONSQUEEZY_WEBHOOK_SECRET
+        sync: false
+      - key: SPECPROOF_TEAM_CHECKOUT_URL
+        sync: false
+      - key: SPECPROOF_SCALE_CHECKOUT_URL
+        sync: false
+    # For persistent SQLite storage across restarts on paid Render plans, add:
+    # disk:
+    #   name: specproof-data
+    #   mountPath: /data
+    #   sizeGB: 1
