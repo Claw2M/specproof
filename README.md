@@ -1,5 +1,10 @@
 # SpecProof
 
+[![npm version](https://img.shields.io/npm/v/@specproof/cli?color=22c55e&label=npm%20%40specproof%2Fcli)](https://www.npmjs.com/package/@specproof/cli)
+[![SpecProof CI](https://github.com/Claw2M/specproof/actions/workflows/ci.yml/badge.svg)](https://github.com/Claw2M/specproof/actions/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-0099ff.svg)](./LICENSE)
+[![Node.js >=22.13](https://img.shields.io/badge/node-%3E%3D22.13.0-5FA04E)](https://nodejs.org/)
+
 **Open-core diff-scoped test integrity, micro-mutation, and spec-to-PR verification gate for AI-assisted engineering teams.**
 
 AI coding agents (Cursor, Claude Code, Copilot, Devin) make generating code and unit tests trivial—but verification has become the bottleneck. Teams face **mock abuse**, **vacuous assertions** (`expect(true).toBe(true)`), **untested boundary conditions**, and **missing acceptance criteria**, while existing AI reviewers charge steep per-seat + overage fees for noisy diff comments.
@@ -30,29 +35,46 @@ specproof/
 
 ## Quickstart
 
+Zero-install CLI via [`@specproof/cli`](https://www.npmjs.com/package/@specproof/cli) (Node.js `>=22.13.0`):
+
 ```bash
+# Initialize .specproof.json and print Cursor / Claude Code MCP config
+npx -y @specproof/cli init
+
+# Scan test integrity across your repository
+npx -y @specproof/cli check --all
+
+# Run diff-scoped micro-mutation testing against main (0-100 threshold)
+npx -y @specproof/cli check --base origin/main --mutate --fail-under 75
+
+# Verify acceptance criteria in SPEC.md (optionally with BYOK LLM)
+OPENAI_API_KEY=... npx -y @specproof/cli check --base main --spec SPEC.md --llm
+```
+
+Or install globally:
+
+```bash
+npm install -g @specproof/cli
+specproof check --all --mutate
+```
+
+<details>
+<summary>Local Monorepo Development Setup (Contributors)</summary>
+
+```bash
+git clone https://github.com/Claw2M/specproof.git
+cd specproof
 npm install
 npm run verify
+node packages/cli/dist/index.js check --all --spec SPEC.md
 ```
 
-Initialize `.specproof.json` in any repository:
-
-```bash
-node packages/cli/dist/index.js init
-```
-
-Run integrity + diff-scoped mutation + BYOK spec checks on your current branch:
-
-```bash
-node packages/cli/dist/index.js check --all
-node packages/cli/dist/index.js check --base main --mutate --fail-under 75
-OPENAI_API_KEY=... node packages/cli/dist/index.js check --base main --spec SPEC.md --llm
-```
+</details>
 
 ### CLI Flags & Environment Variables
 
-* **Check flags:** `--repo <path>`, `--base <ref>`, `--all`, `--mutate`, `--test-cmd <cmd>`, `--fail-under <0-100>`, `--spec <path>`, `--llm`, `--provider <openai|anthropic|gemini>`, `--model <name>`, `--post-pr-comment`, `--post-check-run`, `--sha <commit-sha>`, `--cloud <url>`, `--upload <url>`, `--strict`, `--require-spec-match`, `--config <path>`, `--branch <name>`, `--repo-slug <owner/repo>`, `--pr <number>`, `--json`, `--markdown`.
-* **Environment variables:** `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `SPECPROOF_API_KEY`, `SPECPROOF_LLM_PROVIDER`, `SPECPROOF_LLM_MODEL`, `GITHUB_TOKEN`, `SPECPROOF_CLOUD_TOKEN`, `SPECPROOF_GITHUB_WEBHOOK_SECRET`, `LINEAR_API_KEY`, `JIRA_BASE_URL`, `JIRA_API_TOKEN`, `JIRA_EMAIL`, `PORT`, `SPECPROOF_DB_PATH`.
+* **Check flags:** `--repo <path>`, `--config <path>`, `--base <ref>`, `--all`, `--mutate`, `--test-cmd <cmd>`, `--fail-under <0-100>`, `--spec <path>`, `--llm`, `--provider <openai|anthropic|gemini>`, `--model <name>`, `--post-pr-comment`, `--post-check-run`, `--sha <commit-sha>`, `--cloud <url>`, `--upload <url>`, `--strict`, `--require-spec-match`, `--branch <name>`, `--repo-slug <owner/repo>`, `--pr <number>`, `--json`, `--markdown`.
+* **Environment variables:** `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `SPECPROOF_API_KEY`, `SPECPROOF_LLM_PROVIDER`, `SPECPROOF_LLM_MODEL`, `GITHUB_TOKEN`, `SPECPROOF_CLOUD_TOKEN`, `SPECPROOF_GITHUB_WEBHOOK_SECRET`, `SPECPROOF_ENFORCE_PLANS`, `SPECPROOF_LEMONSQUEEZY_WEBHOOK_SECRET`, `SPECPROOF_CHECKOUT_URL`, `LINEAR_API_KEY`, `JIRA_BASE_URL`, `JIRA_API_TOKEN`, `JIRA_EMAIL`, `PORT`, `SPECPROOF_DB_PATH`.
 * **Runtime requirement:** Node.js `>=22.13.0` (`node:sqlite` for `@specproof/cloud`).
 
 ---
@@ -74,16 +96,16 @@ OPENAI_API_KEY=... node packages/cli/dist/index.js check --base main --spec SPEC
 
 ---
 
-## MCP Integration (Cursor / Claude Code)
+## MCP Integration (Cursor / Claude Code / Antigravity)
 
-Add SpecProof as a local MCP server so your coding agent must verify test integrity and mutations before finishing a task:
+Add SpecProof as an MCP server so your coding agent verifies test integrity and mutations before finishing a task:
 
 ```json
 {
   "mcpServers": {
     "specproof": {
-      "command": "node",
-      "args": ["/absolute/path/to/specproof/packages/cli/dist/index.js", "mcp"]
+      "command": "npx",
+      "args": ["-y", "@specproof/cli", "mcp"]
     }
   }
 }
@@ -98,14 +120,14 @@ Available MCP tools:
 
 ## Open-Core Roadmap
 
-- **OSS Core (Apache-2.0):** Local CLI, MCP server, TS/JS & Python AST integrity rules, diff-scoped micro-mutation, GitHub Action markdown/JSON reports.
-- **Team Cloud (`apps/web`):** Multi-repo PR evidence dashboard, Linear/Jira/GitHub spec sync, org-wide policy enforcement, unlimited-seat flat pricing. Start locally with:
+- **OSS Core (Apache-2.0):** Local CLI (`npx @specproof/cli`), MCP server, TS/JS, Python & Go AST integrity rules, diff-scoped micro-mutation, GitHub Action markdown/JSON reports & Check Runs.
+- **Team Cloud (`apps/web`):** Multi-repo PR evidence dashboard, Linear/Jira/GitHub spec sync, org-wide policy enforcement, Lemon Squeezy billing & plan limits, unlimited-seat flat pricing. Start locally with:
 
 ```bash
 npm run build
 node apps/web/dist/bin.js --demo
 # Pull org policies & synced Linear/Jira specs, verify diff, and upload proof:
-node packages/cli/dist/index.js check --all --cloud http://localhost:4310
+npx -y @specproof/cli check --all --cloud http://localhost:4310
 ```
 
 Or run self-hosted Enterprise Cloud via Docker:
