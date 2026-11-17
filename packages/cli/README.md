@@ -40,4 +40,4 @@ Exposed MCP tools:
 - `run_diff_mutation`
 - `verify_spec_coverage`
 
-Repository & full docs: https://github.com/Claw2M/specproof-
+Repository & full docs: https://github.com/Claw2M/specproof

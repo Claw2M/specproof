@@ -3,14 +3,14 @@
   "version": "0.2.0",
   "description": "Git diff parser, TS/JS/Python/Go AST test integrity analyzer, spec mapper, GitHub Check Runs, and report formatters for SpecProof.",
   "license": "Apache-2.0",
-  "homepage": "https://github.com/Claw2M/specproof-#readme",
+  "homepage": "https://github.com/Claw2M/specproof#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Claw2M/specproof-.git",
+    "url": "git+https://github.com/Claw2M/specproof.git",
     "directory": "packages/core"
   },
   "bugs": {
-    "url": "https://github.com/Claw2M/specproof-/issues"
+    "url": "https://github.com/Claw2M/specproof/issues"
   },
   "type": "module",
   "main": "./dist/index.js",

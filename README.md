@@ -63,7 +63,7 @@ OPENAI_API_KEY=... node packages/cli/dist/index.js check --base main --spec SPEC
 - uses: actions/checkout@v4
   with:
     fetch-depth: 0
-- uses: Claw2M/specproof-@main
+- uses: Claw2M/specproof@main
   with:
     base-ref: origin/${{ github.base_ref }}
     mutate: 'true'

@@ -6,7 +6,7 @@ compatibility: Node.js >=22.13.0 and git (for diff scoping). Works with Cursor, 
 metadata:
   author: Claw2M
   version: "0.2.0"
-  repository: "https://github.com/Claw2M/specproof-"
+  repository: "https://github.com/Claw2M/specproof"
 ---
 
 # SpecProof Verification Gate
@@ -60,5 +60,5 @@ Follow this order on every feature or bugfix change:
 
 ## References & Assets
 
-- Read `references/cli-and-mcp.md` when setting up MCP servers, GitHub Actions (`Claw2M/specproof-@main`), BYOK LLM keys, or CI environment variables.
+- Read `references/cli-and-mcp.md` when setting up MCP servers, GitHub Actions (`Claw2M/specproof@main`), BYOK LLM keys, or CI environment variables.
 - Use `assets/specproof.config.example.json` as a clean `.specproof.json` starter template.

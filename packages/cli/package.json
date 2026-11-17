@@ -3,14 +3,14 @@
   "version": "0.2.0",
   "description": "CLI, MCP launcher, and GitHub Action verification gate for SpecProof.",
   "license": "Apache-2.0",
-  "homepage": "https://github.com/Claw2M/specproof-#readme",
+  "homepage": "https://github.com/Claw2M/specproof#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Claw2M/specproof-.git",
+    "url": "git+https://github.com/Claw2M/specproof.git",
     "directory": "packages/cli"
   },
   "bugs": {
-    "url": "https://github.com/Claw2M/specproof-/issues"
+    "url": "https://github.com/Claw2M/specproof/issues"
   },
   "type": "module",
   "main": "./dist/index.js",

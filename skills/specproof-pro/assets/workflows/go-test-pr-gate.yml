@@ -24,7 +24,7 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - uses: Claw2M/specproof-@main
+      - uses: Claw2M/specproof@main
         env:
           SPECPROOF_CLOUD_TOKEN: ${{ secrets.SPECPROOF_CLOUD_TOKEN }}
         with:

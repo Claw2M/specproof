@@ -7,7 +7,7 @@ metadata:
   author: Claw2M
   version: "0.2.0"
   tier: "pro-pack"
-  repository: "https://github.com/Claw2M/specproof-"
+  repository: "https://github.com/Claw2M/specproof"
 ---
 
 # SpecProof Pro Pack — Team Rollout & Self-Hosted Cloud Kit
