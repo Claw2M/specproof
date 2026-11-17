@@ -1,0 +1,22 @@
+{
+  "testCommand": "npm test",
+  "maxMutantsPerRun": 40,
+  "mutationTimeoutMs": 15000,
+  "failUnderMutationScore": 85,
+  "mockToAssertionMaxRatio": 1.5,
+  "minMocksBeforeFlagging": 2,
+  "blockOnMockAbuse": true,
+  "blockOnVacuous": true,
+  "requireSpecMatch": true,
+  "specFile": "SPEC.md",
+  "ignorePatterns": [
+    "node_modules",
+    "dist",
+    "build",
+    "coverage",
+    ".specproof-tmp",
+    ".specproof-cloud",
+    ".next",
+    "examples"
+  ]
+}

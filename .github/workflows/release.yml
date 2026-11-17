@@ -1,0 +1,51 @@
+name: Publish npm Packages
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Run npm pack --dry-run instead of publishing'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+          cache: npm
+
+      - run: npm ci
+      - run: npm run verify
+      - run: npm run pack:check
+
+      - name: Publish @specproof packages in dependency order
+        if: ${{ github.event_name == 'push' || inputs.dry_run == 'false' }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "NPM_TOKEN secret is not configured. Add NPM_TOKEN in GitHub repository secrets to publish."
+            exit 1
+          fi
+          npm publish --workspace=@specproof/core --access public --provenance
+          npm publish --workspace=@specproof/mutator --access public --provenance
+          npm publish --workspace=@specproof/mcp-server --access public --provenance
+          npm publish --workspace=@specproof/cli --access public --provenance

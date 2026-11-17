@@ -1,7 +1,7 @@
 {
   "name": "@specproof/cloud",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "SpecProof Team Cloud & self-hosted PR verification evidence control plane.",
   "license": "Apache-2.0",
   "type": "module",
@@ -16,7 +16,7 @@
     "start": "node dist/bin.js"
   },
   "dependencies": {
-    "@specproof/core": "0.1.0",
+    "@specproof/core": "0.2.0",
     "zod": "^4.0.0"
   }
 }

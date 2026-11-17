@@ -1,7 +1,7 @@
 {
   "name": "specproof-monorepo",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Open-core diff-scoped test integrity, micro-mutation, and spec-to-PR verification gate for AI-assisted engineering teams.",
   "license": "Apache-2.0",
   "workspaces": [
@@ -13,7 +13,8 @@
     "typecheck": "tsc -b",
     "test": "vitest run",
     "test:watch": "vitest",
-    "verify": "npm run build && npm test"
+    "verify": "npm run build && npm test",
+    "pack:check": "npm pack --dry-run --workspace=@specproof/core --workspace=@specproof/mutator --workspace=@specproof/mcp-server --workspace=@specproof/cli"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

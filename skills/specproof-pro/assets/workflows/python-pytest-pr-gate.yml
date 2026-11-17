@@ -1,0 +1,44 @@
+name: SpecProof Python PR Gate
+
+on:
+  pull_request:
+    branches: [main, master]
+
+concurrency:
+  group: specproof-py-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  specproof-gate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install pytest
+
+      - uses: Claw2M/specproof-@main
+        env:
+          SPECPROOF_CLOUD_TOKEN: ${{ secrets.SPECPROOF_CLOUD_TOKEN }}
+        with:
+          base-ref: origin/${{ github.base_ref }}
+          mutate: 'true'
+          fail-under: '75'
+          test-command: pytest -q
+          spec: SPEC.md
+          post-pr-comment: 'true'
+          post-check-run: 'true'
+          cloud: ${{ vars.SPECPROOF_CLOUD_URL }}

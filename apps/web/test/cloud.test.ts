@@ -361,4 +361,130 @@ describe('SpecProof Team Cloud server & SQLite store', () => {
       store.close();
     }
   });
+
+  it('enforces plan repository limits and processes Lemon Squeezy billing webhooks', async () => {
+    const lemonSecret = 'lemon-signing-secret';
+    const { server, store } = createCloudServer({
+      dbPath: ':memory:',
+      apiToken: 'billing-tok',
+      lemonSqueezyWebhookSecret: lemonSecret,
+      enforcePlanLimits: true,
+    });
+
+    await new Promise<void>((resolve) => {
+      server.listen(0, '127.0.0.1', () => resolve());
+    });
+
+    try {
+      const addr = server.address();
+      if (!addr || typeof addr === 'string') {
+        throw new Error('Unexpected server address');
+      }
+      const baseUrl = `http://127.0.0.1:${addr.port}`;
+
+      // 1. Starts on OSS plan (maxRepos: 1)
+      const initBilling = await fetch(`${baseUrl}/api/billing`, {
+        headers: { Authorization: 'Bearer billing-tok' },
+      });
+      expect(initBilling.status).toBe(200);
+      const initJson = (await initBilling.json()) as {
+        billing: { plan: string; maxRepos: number | null };
+        distinctRepos: number;
+      };
+      expect(initJson.billing.plan).toBe('oss');
+      expect(initJson.billing.maxRepos).toBe(1);
+
+      // 2. First repo works repeatedly
+      for (let i = 0; i < 2; i++) {
+        const res = await fetch(`${baseUrl}/api/runs`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer billing-tok',
+          },
+          body: JSON.stringify({
+            repoSlug: 'acme/repo-one',
+            branch: 'main',
+            report: makeSampleReport(true),
+          }),
+        });
+        expect(res.status).toBe(201);
+      }
+
+      // 3. Second distinct repo is blocked on OSS with 402
+      const blockedRes = await fetch(`${baseUrl}/api/runs`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer billing-tok',
+        },
+        body: JSON.stringify({
+          repoSlug: 'acme/repo-two',
+          branch: 'main',
+          report: makeSampleReport(true),
+        }),
+      });
+      expect(blockedRes.status).toBe(402);
+      const blockedJson = (await blockedRes.json()) as { code: string; plan: string };
+      expect(blockedJson.code).toBe('PLAN_REPO_LIMIT_REACHED');
+      expect(blockedJson.plan).toBe('oss');
+
+      // 4. Rejects forged Lemon Squeezy webhook signature
+      const upgradeBody = JSON.stringify({
+        meta: { event_name: 'subscription_created', custom_data: { plan: 'team' } },
+        data: {
+          id: 'sub_9001',
+          attributes: {
+            status: 'active',
+            user_email: 'lead@acme.dev',
+            variant_name: 'Team Cloud',
+          },
+        },
+      });
+      const forgedRes = await fetch(`${baseUrl}/api/webhooks/lemonsqueezy`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Signature': 'a'.repeat(64),
+        },
+        body: upgradeBody,
+      });
+      expect(forgedRes.status).toBe(401);
+
+      // 5. Valid Lemon Squeezy HMAC webhook upgrades plan to Team (5 repos) and unblocks repo-two
+      const validSig = crypto.createHmac('sha256', lemonSecret).update(upgradeBody).digest('hex');
+      const upgradeRes = await fetch(`${baseUrl}/api/webhooks/lemonsqueezy`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Signature': validSig,
+        },
+        body: upgradeBody,
+      });
+      expect(upgradeRes.status).toBe(202);
+      const upgradeJson = (await upgradeRes.json()) as {
+        billing: { plan: string; maxRepos: number; provider: string };
+      };
+      expect(upgradeJson.billing.plan).toBe('team');
+      expect(upgradeJson.billing.maxRepos).toBe(5);
+      expect(upgradeJson.billing.provider).toBe('lemonsqueezy');
+
+      const retryRes = await fetch(`${baseUrl}/api/runs`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer billing-tok',
+        },
+        body: JSON.stringify({
+          repoSlug: 'acme/repo-two',
+          branch: 'feat/payments',
+          report: makeSampleReport(true),
+        }),
+      });
+      expect(retryRes.status).toBe(201);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      store.close();
+    }
+  });
 });

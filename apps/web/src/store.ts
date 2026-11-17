@@ -3,6 +3,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import type { VerificationReport } from '@specproof/core';
+import {
+  PLAN_CATALOG,
+  type BillingPlanId,
+  type BillingProvider,
+  type BillingStatus,
+  type WorkspaceBilling,
+} from './billing.js';
 
 export interface RunSummary {
   id: string;
@@ -173,7 +180,19 @@ export class CloudStore {
         created_at TEXT NOT NULL
       );
 
-      PRAGMA user_version = 1;
+      CREATE TABLE IF NOT EXISTS workspace_billing (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        plan TEXT NOT NULL,
+        status TEXT NOT NULL,
+        provider TEXT NOT NULL,
+        max_repos INTEGER,
+        customer_email TEXT,
+        external_subscription_id TEXT,
+        checkout_url TEXT,
+        updated_at TEXT NOT NULL
+      );
+
+      PRAGMA user_version = 2;
     `);
 
     const existing = this.db.prepare('SELECT id FROM org_policies WHERE id = 1').get();
@@ -184,6 +203,16 @@ export class CloudStore {
            VALUES (1, 70, 1, 1, 0, ?)`,
         )
         .run(new Date().toISOString());
+    }
+
+    const existingBilling = this.db.prepare('SELECT id FROM workspace_billing WHERE id = 1').get();
+    if (!existingBilling) {
+      this.db
+        .prepare(
+          `INSERT INTO workspace_billing (id, plan, status, provider, max_repos, customer_email, external_subscription_id, checkout_url, updated_at)
+           VALUES (1, 'oss', 'active', 'manual', ?, NULL, NULL, ?, ?)`,
+        )
+        .run(PLAN_CATALOG.oss.maxRepos, process.env.SPECPROOF_CHECKOUT_URL ?? null, new Date().toISOString());
     }
   }
 
@@ -560,6 +589,104 @@ export class CloudStore {
       this.recordAudit('spec_deleted', id, 'Deleted synced spec');
     }
     return removed;
+  }
+
+  getBilling(): WorkspaceBilling {
+    const row = this.db.prepare('SELECT * FROM workspace_billing WHERE id = 1').get() as Record<string, unknown>;
+    return {
+      plan: String(row.plan) as BillingPlanId,
+      status: String(row.status) as BillingStatus,
+      provider: String(row.provider) as BillingProvider,
+      maxRepos: row.max_repos === null || row.max_repos === undefined ? null : Number(row.max_repos),
+      customerEmail: row.customer_email ? String(row.customer_email) : null,
+      externalSubscriptionId: row.external_subscription_id ? String(row.external_subscription_id) : null,
+      checkoutUrl: row.checkout_url ? String(row.checkout_url) : null,
+      updatedAt: String(row.updated_at),
+    };
+  }
+
+  updateBilling(patch: {
+    plan?: BillingPlanId;
+    status?: BillingStatus;
+    provider?: BillingProvider;
+    maxRepos?: number | null;
+    customerEmail?: string | null;
+    externalSubscriptionId?: string | null;
+    checkoutUrl?: string | null;
+  }): WorkspaceBilling {
+    const current = this.getBilling();
+    const nextPlan = patch.plan ?? current.plan;
+    const defaultMaxRepos = PLAN_CATALOG[nextPlan].maxRepos;
+    const nextMaxRepos =
+      patch.maxRepos !== undefined
+        ? patch.maxRepos
+        : patch.plan !== undefined
+          ? defaultMaxRepos
+          : current.maxRepos;
+
+    const next: WorkspaceBilling = {
+      plan: nextPlan,
+      status: patch.status ?? current.status,
+      provider: patch.provider ?? current.provider,
+      maxRepos: nextMaxRepos,
+      customerEmail: patch.customerEmail !== undefined ? patch.customerEmail : current.customerEmail,
+      externalSubscriptionId:
+        patch.externalSubscriptionId !== undefined ? patch.externalSubscriptionId : current.externalSubscriptionId,
+      checkoutUrl: patch.checkoutUrl !== undefined ? patch.checkoutUrl : current.checkoutUrl,
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.db
+      .prepare(
+        `UPDATE workspace_billing
+         SET plan = ?, status = ?, provider = ?, max_repos = ?, customer_email = ?, external_subscription_id = ?, checkout_url = ?, updated_at = ?
+         WHERE id = 1`,
+      )
+      .run(
+        next.plan,
+        next.status,
+        next.provider,
+        next.maxRepos,
+        next.customerEmail,
+        next.externalSubscriptionId,
+        next.checkoutUrl,
+        next.updatedAt,
+      );
+
+    this.recordAudit('billing_updated', 'workspace_billing_1', `plan=${next.plan} status=${next.status}`);
+    return next;
+  }
+
+  canIngestRepo(repoSlug: string): {
+    allowed: boolean;
+    billing: WorkspaceBilling;
+    distinctRepos: number;
+    repoAlreadyTracked: boolean;
+  } {
+    const billing = this.getBilling();
+    const reposRow = this.db
+      .prepare('SELECT COUNT(DISTINCT repo_slug) AS cnt FROM verification_runs')
+      .get() as { cnt: number };
+    const distinctRepos = Number(reposRow?.cnt ?? 0);
+    const existing = this.db
+      .prepare('SELECT 1 AS found FROM verification_runs WHERE repo_slug = ? LIMIT 1')
+      .get(repoSlug);
+    const repoAlreadyTracked = Boolean(existing);
+
+    if (billing.status === 'canceled' || billing.status === 'past_due') {
+      return { allowed: false, billing, distinctRepos, repoAlreadyTracked };
+    }
+
+    if (billing.maxRepos === null || repoAlreadyTracked) {
+      return { allowed: true, billing, distinctRepos, repoAlreadyTracked };
+    }
+
+    return {
+      allowed: distinctRepos < billing.maxRepos,
+      billing,
+      distinctRepos,
+      repoAlreadyTracked,
+    };
   }
 
   close(): void {

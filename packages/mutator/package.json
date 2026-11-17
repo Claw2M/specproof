@@ -1,8 +1,17 @@
 {
   "name": "@specproof/mutator",
-  "version": "0.1.0",
-  "description": "Diff-scoped TypeScript/JavaScript micro-mutation generator and isolated runner for SpecProof.",
+  "version": "0.2.0",
+  "description": "Diff-scoped TypeScript/JavaScript, Python, and Go micro-mutation generator and isolated parallel runner for SpecProof.",
   "license": "Apache-2.0",
+  "homepage": "https://github.com/Claw2M/specproof-#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Claw2M/specproof-.git",
+    "directory": "packages/mutator"
+  },
+  "bugs": {
+    "url": "https://github.com/Claw2M/specproof-/issues"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -25,7 +34,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@specproof/core": "0.1.0",
+    "@specproof/core": "0.2.0",
     "typescript": "^5.8.0"
   }
 }

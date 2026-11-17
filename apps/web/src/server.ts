@@ -2,6 +2,11 @@ import crypto from 'node:crypto';
 import http from 'node:http';
 import { verifyGitHubWebhookSignature, type FetchLike, type VerificationReport } from '@specproof/core';
 import { z } from 'zod';
+import {
+  PLAN_CATALOG,
+  parseLemonSqueezyWebhook,
+  verifyLemonSqueezySignature,
+} from './billing.js';
 import { renderDashboardHtml } from './dashboardHtml.js';
 import { seedDemoData } from './demoData.js';
 import { pullExternalIssueSpec } from './issueSync.js';
@@ -11,6 +16,8 @@ export interface CloudServerOptions {
   dbPath: string;
   apiToken?: string;
   githubWebhookSecret?: string;
+  lemonSqueezyWebhookSecret?: string;
+  enforcePlanLimits?: boolean;
   fetchImpl?: FetchLike;
 }
 
@@ -35,6 +42,14 @@ const PolicyPatchSchema = z.object({
   blockOnMockAbuse: z.boolean().optional(),
   blockOnVacuous: z.boolean().optional(),
   requireSpecMatch: z.boolean().optional(),
+});
+
+const BillingPatchSchema = z.object({
+  plan: z.enum(['oss', 'team', 'scale', 'enterprise']).optional(),
+  status: z.enum(['active', 'trialing', 'past_due', 'canceled']).optional(),
+  maxRepos: z.number().int().positive().max(10_000).nullable().optional(),
+  customerEmail: z.string().trim().email().max(200).nullable().optional(),
+  checkoutUrl: z.string().trim().url().max(500).nullable().optional(),
 });
 
 const SpecUpsertSchema = z.object({
@@ -214,6 +229,38 @@ export function createCloudServer(options: CloudServerOptions): CloudServerHandl
         return;
       }
 
+      if (method === 'POST' && url.pathname === '/api/webhooks/lemonsqueezy') {
+        const rawBuf = await readRawBody(req);
+        const secret = options.lemonSqueezyWebhookSecret ?? process.env.SPECPROOF_LEMONSQUEEZY_WEBHOOK_SECRET;
+        if (!secret) {
+          sendJson(res, 503, { error: 'Lemon Squeezy webhook secret not configured.' });
+          return;
+        }
+        const sig = req.headers['x-signature'];
+        if (typeof sig !== 'string' || !verifyLemonSqueezySignature(rawBuf, sig, secret)) {
+          sendJson(res, 401, { error: 'Invalid Lemon Squeezy webhook signature.' });
+          return;
+        }
+        let payload: unknown;
+        try {
+          payload = JSON.parse(rawBuf.toString('utf8')) as unknown;
+        } catch {
+          sendJson(res, 400, { error: 'Malformed Lemon Squeezy JSON payload.' });
+          return;
+        }
+        const parsedWebhook = parseLemonSqueezyWebhook(payload);
+        const updated = store.updateBilling({
+          plan: parsedWebhook.plan,
+          status: parsedWebhook.status,
+          provider: 'lemonsqueezy',
+          customerEmail: parsedWebhook.customerEmail,
+          externalSubscriptionId: parsedWebhook.externalSubscriptionId,
+        });
+        store.recordAudit('lemonsqueezy_webhook', parsedWebhook.eventName, `plan=${updated.plan} status=${updated.status}`);
+        sendJson(res, 202, { accepted: true, event: parsedWebhook.eventName, billing: updated });
+        return;
+      }
+
       if (url.pathname.startsWith('/api/') && !isAuthorized(req, options.apiToken)) {
         sendJson(res, 401, { error: 'Unauthorized' });
         return;
@@ -286,8 +333,29 @@ export function createCloudServer(options: CloudServerOptions): CloudServerHandl
           return;
         }
 
+        const enforcePlans = options.enforcePlanLimits ?? process.env.SPECPROOF_ENFORCE_PLANS === '1';
+        const effectiveRepoSlug =
+          parsed.data.repoSlug?.trim() ||
+          parsed.data.report.repoRoot.split(/[\\/]/).filter(Boolean).pop() ||
+          'local-repo';
+        if (enforcePlans) {
+          const eligibility = store.canIngestRepo(effectiveRepoSlug);
+          if (!eligibility.allowed) {
+            sendJson(res, 402, {
+              error: `Plan '${eligibility.billing.plan}' repository limit reached (${eligibility.distinctRepos}/${eligibility.billing.maxRepos ?? 'unlimited'}) or subscription inactive (${eligibility.billing.status}).`,
+              code: 'PLAN_REPO_LIMIT_REACHED',
+              plan: eligibility.billing.plan,
+              status: eligibility.billing.status,
+              maxRepos: eligibility.billing.maxRepos,
+              distinctRepos: eligibility.distinctRepos,
+              upgradeUrl: eligibility.billing.checkoutUrl,
+            });
+            return;
+          }
+        }
+
         const stored = store.insertRun({
-          repoSlug: parsed.data.repoSlug,
+          repoSlug: effectiveRepoSlug,
           branch: parsed.data.branch,
           prNumber: parsed.data.prNumber,
           report: parsed.data.report as unknown as VerificationReport,
@@ -325,6 +393,33 @@ export function createCloudServer(options: CloudServerOptions): CloudServerHandl
           runs: store.listRuns(100),
           auditLogs: store.listAuditLogs(200),
         });
+        return;
+      }
+
+      if (method === 'GET' && url.pathname === '/api/billing') {
+        const billing = store.getBilling();
+        const check = store.canIngestRepo('__probe__');
+        sendJson(res, 200, {
+          billing,
+          distinctRepos: check.distinctRepos,
+          catalog: PLAN_CATALOG,
+        });
+        return;
+      }
+
+      if (method === 'PUT' && url.pathname === '/api/billing') {
+        assertJsonContentType(req);
+        const body = await readJsonBody(req);
+        const parsed = BillingPatchSchema.safeParse(body);
+        if (!parsed.success) {
+          sendJson(res, 400, { error: 'Invalid billing payload', details: parsed.error.issues });
+          return;
+        }
+        const updated = store.updateBilling({
+          ...parsed.data,
+          provider: 'manual',
+        });
+        sendJson(res, 200, updated);
         return;
       }
 

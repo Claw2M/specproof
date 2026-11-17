@@ -1395,7 +1395,7 @@ Spec Match : 3/3 acceptance criteria verified</pre>
 
         <div class="split-2">
           <div class="subcard">
-            <h3>Org-Wide Policy Gate <span id="policy-saved-badge" aria-live="polite" style="color:var(--ink-muted);font-weight:400;font-size:13px;">· Synced</span></h3>
+            <h3>Org-Wide Policy Gate <span id="policy-saved-badge" aria-live="polite" style="color:var(--ink-muted);font-weight:400;font-size:13px;">· Synced</span> <span id="workspace-plan-badge" style="color:var(--accent-blue);font-weight:500;font-size:12px;margin-inline-start:6px;"></span></h3>
             <form id="policy-form" class="policy-form">
               <label class="policy-row">
                 <span>Min Diff Mutation Score (0–100%)</span>
@@ -1851,16 +1851,23 @@ Spec Match : 3/3 acceptance criteria verified</pre>
 
     async function loadDashboard() {
       const headers = buildHeaders(false);
-      const [runsPayload, policy, specsPayload] = await Promise.all([
+      const [runsPayload, policy, specsPayload, billingPayload] = await Promise.all([
         apiFetchJson('/api/runs', { headers }),
         apiFetchJson('/api/policies', { headers }),
         apiFetchJson('/api/specs', { headers }),
+        apiFetchJson('/api/billing', { headers }).catch(() => null),
       ]);
 
       state.runs = runsPayload.runs || [];
       state.trends = runsPayload.trends || [];
       state.specs = specsPayload.specs || [];
       const stats = runsPayload.stats || {};
+      const planBadge = document.getElementById('workspace-plan-badge');
+      if (planBadge && billingPayload?.billing) {
+        const b = billingPayload.billing;
+        const limitLabel = b.maxRepos === null ? 'unlimited' : billingPayload.distinctRepos + '/' + b.maxRepos + ' repos';
+        planBadge.textContent = '· Plan: ' + String(b.plan).toUpperCase() + ' (' + limitLabel + ')';
+      }
 
       document.getElementById('kpi-total').textContent = String(stats.totalRuns ?? 0);
       document.getElementById('kpi-pass-rate').textContent = (stats.passRate ?? 100).toFixed(1) + '%';
