@@ -5,7 +5,9 @@ import { z } from 'zod';
 import {
   PLAN_CATALOG,
   parseLemonSqueezyWebhook,
+  parsePolarWebhook,
   verifyLemonSqueezySignature,
+  verifyPolarWebhookSignature,
 } from './billing.js';
 import { renderDashboardHtml } from './dashboardHtml.js';
 import { seedDemoData } from './demoData.js';
@@ -17,6 +19,7 @@ export interface CloudServerOptions {
   apiToken?: string;
   githubWebhookSecret?: string;
   lemonSqueezyWebhookSecret?: string;
+  polarWebhookSecret?: string;
   enforcePlanLimits?: boolean;
   fetchImpl?: FetchLike;
 }
@@ -269,6 +272,48 @@ export function createCloudServer(options: CloudServerOptions): CloudServerHandl
           externalSubscriptionId: parsedWebhook.externalSubscriptionId,
         });
         store.recordAudit('lemonsqueezy_webhook', parsedWebhook.eventName, `plan=${updated.plan} status=${updated.status}`);
+        sendJson(res, 202, { accepted: true, event: parsedWebhook.eventName, billing: updated });
+        return;
+      }
+
+      if (method === 'POST' && url.pathname === '/api/webhooks/polar') {
+        const rawBuf = await readRawBody(req);
+        const secret = options.polarWebhookSecret ?? process.env.SPECPROOF_POLAR_WEBHOOK_SECRET;
+        if (!secret) {
+          sendJson(res, 503, { error: 'Polar webhook secret not configured.' });
+          return;
+        }
+        const verified = verifyPolarWebhookSignature(
+          rawBuf,
+          {
+            webhookId: typeof req.headers['webhook-id'] === 'string' ? req.headers['webhook-id'] : undefined,
+            webhookTimestamp:
+              typeof req.headers['webhook-timestamp'] === 'string' ? req.headers['webhook-timestamp'] : undefined,
+            webhookSignature:
+              typeof req.headers['webhook-signature'] === 'string' ? req.headers['webhook-signature'] : undefined,
+          },
+          secret,
+        );
+        if (!verified) {
+          sendJson(res, 401, { error: 'Invalid Polar webhook signature.' });
+          return;
+        }
+        let payload: unknown;
+        try {
+          payload = JSON.parse(rawBuf.toString('utf8')) as unknown;
+        } catch {
+          sendJson(res, 400, { error: 'Malformed Polar JSON payload.' });
+          return;
+        }
+        const parsedWebhook = parsePolarWebhook(payload);
+        const updated = store.updateBilling({
+          plan: parsedWebhook.plan,
+          status: parsedWebhook.status,
+          provider: 'polar',
+          customerEmail: parsedWebhook.customerEmail,
+          externalSubscriptionId: parsedWebhook.externalSubscriptionId,
+        });
+        store.recordAudit('polar_webhook', parsedWebhook.eventName, `plan=${updated.plan} status=${updated.status}`);
         sendJson(res, 202, { accepted: true, event: parsedWebhook.eventName, billing: updated });
         return;
       }

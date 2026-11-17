@@ -494,4 +494,79 @@ describe('SpecProof Team Cloud server & SQLite store', () => {
       store.close();
     }
   });
+
+  it('verifies Polar Standard Webhooks signatures and updates Scale plan state', async () => {
+    const polarSecret = 'whsec_polar_test_secret_123';
+    const { server, store } = createCloudServer({
+      dbPath: ':memory:',
+      apiToken: 'polar-api-tok',
+      polarWebhookSecret: polarSecret,
+      enforcePlanLimits: true,
+    });
+
+    await new Promise<void>((resolve) => {
+      server.listen(0, '127.0.0.1', () => resolve());
+    });
+
+    try {
+      const addr = server.address();
+      if (!addr || typeof addr === 'string') {
+        throw new Error('Unexpected server address');
+      }
+      const baseUrl = `http://127.0.0.1:${addr.port}`;
+
+      const tsNow = Math.floor(Date.now() / 1000).toString();
+      const msgId = 'msg_polar_001';
+      const payload = JSON.stringify({
+        type: 'subscription.created',
+        timestamp: new Date().toISOString(),
+        data: {
+          id: 'sub_polar_777',
+          status: 'active',
+          customer: { email: 'cto@acme.dev' },
+          product: { name: 'SpecProof Scale' },
+          metadata: { plan: 'scale' },
+        },
+      });
+
+      const forgedRes = await fetch(`${baseUrl}/api/webhooks/polar`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'webhook-id': msgId,
+          'webhook-timestamp': tsNow,
+          'webhook-signature': 'v1,invalidSignatureBase64=',
+        },
+        body: payload,
+      });
+      expect(forgedRes.status).toBe(401);
+
+      const sigB64 = crypto
+        .createHmac('sha256', Buffer.from(polarSecret, 'utf8'))
+        .update(`${msgId}.${tsNow}.${payload}`)
+        .digest('base64');
+
+      const validRes = await fetch(`${baseUrl}/api/webhooks/polar`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'webhook-id': msgId,
+          'webhook-timestamp': tsNow,
+          'webhook-signature': `v1,${sigB64}`,
+        },
+        body: payload,
+      });
+      expect(validRes.status).toBe(202);
+      const validJson = (await validRes.json()) as {
+        billing: { plan: string; maxRepos: number | null; provider: string; customerEmail: string };
+      };
+      expect(validJson.billing.plan).toBe('scale');
+      expect(validJson.billing.maxRepos).toBeNull();
+      expect(validJson.billing.provider).toBe('polar');
+      expect(validJson.billing.customerEmail).toBe('cto@acme.dev');
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      store.close();
+    }
+  });
 });
